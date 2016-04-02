@@ -218,10 +218,13 @@ nbody6Input[file_, opts:OptionsPattern[]] :=
 (* ::Subsection:: *)
 (*Read Ouput*)
 
+Print["loading ReadOuput code ..."];
 
 ReadOutput[file_] := 
 	Module[{strm, string, string1, template1, read1}, 
-		strm = OpenRead["output"];
+		Print[file];
+		strm = OpenRead[file];
+		Print[file];
 		string = ReadList[strm, String];
 		Close[strm];
 
