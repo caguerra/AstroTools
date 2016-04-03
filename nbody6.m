@@ -218,19 +218,15 @@ nbody6Input[file_, opts:OptionsPattern[]] :=
 (* ::Subsection:: *)
 (*Read Ouput*)
 
-Print["loading ReadOuput code ..."];
-
 ReadOutput[file_] := 
 	Module[{strm, string, string1, template1, read1}, 
-		Print[file];
 		strm = OpenRead[file];
-		Print[file];
 		string = ReadList[strm, String];
 		Close[strm];
 
 		string1 = DeleteCases[StringCases[string, "#1"~~x___:>x], {}]; 
 		template1 = {5,6,6,7,5,7,6,7,6,6,7,5,6,8,8,9,7,7,6,6,6,6};
-		template1 = {1,0} + #& /@ Partition[Prepend[Accumulatex[template1], 0], 2, 1];
+		template1 = {1,0} + #& /@ Partition[Prepend[Accumulate[template1], 0], 2, 1];
 		read1 = StringToNumbers /@ First@StringTake[#, template1]&;
 		read1 /@ string1
 
