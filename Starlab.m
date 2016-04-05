@@ -115,13 +115,13 @@ convertStoryLine3[string_] :=
 	]
 
 
-(*SetAttributes[DynToXML, HoldFirst];
+SetAttributes[DynToXML, HoldFirst];
 
 Options[DynToXML] = {Path -> Automatic}
 
 DynToXML[data_, file_, opts:OptionsPattern[]]:=
 	Module[
-		{lines, line, strm, dir},
+		{lines, line, strm, dir, k},
 		
 		dir = OptionValue[Path] /. Automatic -> Directory[];
 		
@@ -167,15 +167,15 @@ DynToXML[data_, file_, opts:OptionsPattern[]]:=
 		ResetDirectory[];
 		Return[0]
 
-	]*)
+	]
 
 
-
+(*
 SetAttributes[DynToXML, HoldFirst];
 
 DynToXML[data_,file_]:=
 	Module[
-		{lines, line, newline, XMLlines, alllines},
+		{lines, line, XMLlines, alllines},
 		
 		Print["start: ", TimeAndMem[]];
 
@@ -215,7 +215,7 @@ DynToXML[data_,file_]:=
 		Null;
 		Print["end: ", TimeAndMem[]];
 
-	]
+	]*)
 
 
 SetAttributes[DynToXML2, HoldFirst];
