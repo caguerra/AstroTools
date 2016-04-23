@@ -21,14 +21,16 @@ StringToNumbers::usage;
 
 (* Calculations *)
 TotalPotentialEnergy::usage = "TotalPotentialEnergy[pos_, vel_]";
-TotalKineticEnergy::usage;
+TotalKineticEnergy::usage = "TotalKineticEnergy[mass_, pos_]";
+VirialRadius::usage = "VirialRadius[mass_, pos_]"
 
 (* Files *)
 StarlabSnapToNBody;
 
 (* Plots and simulations *)
-ScaledListPlot::usage;
-ClusterPlot::usage = "ClusterPlot[{pos, cm, mcm}, t] plots the starts at time t"
+ScaledListPlot::usage = "ScaledListPlot[list_] ";
+ClusterPlot::usage = "ClusterPlot[{pos, cm, mcm}, t] plots the star cluster at time t"
+ClusterPlot3D::usage = "ClusterPlot3D[{pos, cm, mcm}, t] plots the stars cluster at time t"
 
 
 $TimeScale
@@ -95,11 +97,35 @@ StringToNumbers[list_List] := Internal`StringToDouble[#]& /@ list
 (* ::Subsection:: *)
 (*Calculations*)
 
+Clear[TotalKineticEnergy]
 
-TotalKineticEnergy[mass_List, vel_List] := 0.5 * MapThread[#1.(Norm /@ #2)^2&, {mass, vel}]
+(* Total kinetic energy at specific time *)
+TotalKineticEnergy[mass_List, vel_List] := 0.5 mass.(Norm/@vel)^2 /; Depth[mass]==2 && Depth[vel]==3
+
+(* Total kinetic energy for all times *)
+TotalKineticEnergy[mass_List, vel_List] := 0.5 * MapThread[#1.(Norm /@ #2)^2&, {mass, vel}] /; Depth[mass]==3 && Depth[vel]==4
 
 
-TotalPotentialEnergy = 
+Clear[TotalPotentialEnergy]
+
+(* Total potential energy at specific time *)
+auxTotalPotentialEnergy1 = 
+	Compile[{{mass,_Real,1}, {pos,_Real,2}},
+		Module[{sum, nmax},
+			nmax = Length @ mass;
+			sum = 0.;
+			Do[ 
+				sum = sum + mass[[i]] mass[[j]]/
+				(\[Sqrt]((pos[[i,1]]-pos[[j,1]])^2+(pos[[i,2]]-pos[[j,2]])^2+(pos[[i,3]]-pos[[j,3]])^2)),
+				{i, nmax}, {j, i-1}
+			];
+			-sum
+		],
+		CompilationTarget -> "C"
+	]
+
+(* Total potential energy for all times *)
+auxTotalPotentialEnergy2 = 
 	Compile[{{mass,_Real,2}, {pos,_Real,3}},
 		Module[{sum, tmax, nmax},
 			tmax = Length[mass];
@@ -116,20 +142,15 @@ TotalPotentialEnergy =
 		],
 		CompilationTarget -> "C"
 	]
+	
+TotalPotentialEnergy[mass_, pos_] := auxTotalPotentialEnergy1[mass, pos] /; Depth[mass] == 2 && Depth[pos] == 3
+TotalPotentialEnergy[mass_, pos_] := auxTotalPotentialEnergy2[mass, pos] /; Depth[mass] == 3 && Depth[pos] == 4 
 
-(*
-TotalPotentialEnergy := 
-	Compile[{{mass, _Real, 2}, {pos, _Real, 3}},
-		Module[{sum},
-			Table[
-				sum=0.;
-				Do[sum = sum + If[i==j, 0., (mass[[t,i]] mass[[t,j]])/Sqrt[(pos[[t,i,1]]-pos[[t,j,1]])^2+(pos[[t,i,2]]-pos[[t,j,2]])^2+(pos[[t,i,3]]-pos[[t,j,3]])^2]],{i, 1000},{j, 1000}];
-				sum, {t, 1000}
-			]
-		]
-	]
-*)
+(* Virial radius at specific time *)
+VirialRadius[mass_, pos_] := - 0.5 Total[mass] / TotalPotentialEnergy[mass, pos] /; Depth[mass] == 2 && Depth[pos] == 3
 
+(* Virial radius at all times *)
+VirialRadius[mass_, pos_] := - 0.5 (Total/@ mass) / TotalPotentialEnergy[mass, pos] /; Depth[mass] == 3 && Depth[pos] == 4
 
 (* ::Subsection:: *)
 (*Plots*)
@@ -212,8 +233,29 @@ ClusterPlot[{pos_, cm_, mcm_}, time_, opts:OptionsPattern[]] :=
 					Axes -> False, PlotRange -> {{-window, window}, {-window, window}}];
 		
 		plot2 = Graphics[{AbsolutePointSize[5], 
-					Red, Point[ cm[[time, proy]]], 
-					Green, Point[ mcm[[time, proy]]]}];
+					Red, Point[ scale cm[[time, proy]]], 
+					Green, Point[ scale mcm[[time, proy]]]}];
+		
+		Show[plot1, plot2]
+	]
+
+Options[ClusterPlot3D] = Join[{"Scale" -> {1, 1, 1}, "Window" -> 50 }, Options[ListPointPlot3D]];
+	
+ClusterPlot3D[{pos_, cm_, mcm_}, time_, opts:OptionsPattern[]] :=
+	Module[
+		{window, plot1, plot2, scale},
+
+		window = OptionValue["Window"];
+		scale = OptionValue["Scale"];
+		
+		plot1 = ListPointPlot3D[(scale * #)& /@ pos[[time, All]],
+					Sequence@@FilterRules[{opts}, Plot],
+					PlotStyle -> PointSize[0.008], 
+					PlotRange -> {{-window, window}, {-window, window}, {-window, window}}];
+		
+		plot2 = Graphics3D[{AbsolutePointSize[5], 
+					Red, Point[ scale cm[[time]]], 
+					Green, Point[ scale mcm[[time]]]}];
 		
 		Show[plot1, plot2]
 	]
@@ -242,7 +284,7 @@ StarlabSnapToNBody[file_, opts:OptionsPattern[]] :=
 				CreateDirectory[outDir]; 
 				SetDirectory[outDir]] 
 		];
-		Export["fort.10", data, "Table"]
+		Export["fort.10", data, "Table"];
 		If[ outDir =!= Automatic, ResetDirectory[]];
 	]
 
