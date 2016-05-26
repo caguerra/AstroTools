@@ -239,19 +239,22 @@ ClusterPlot[{pos_, cm_, mcm_}, time_, opts:OptionsPattern[]] :=
 		Show[plot1, plot2]
 	]
 
-Options[ClusterPlot3D] = Join[{"Scale" -> {1, 1, 1}, "Window" -> 50 }, Options[ListPointPlot3D]];
+Options[ClusterPlot3D] = Join[{"Scale" -> {1, 1, 1}, "Window" -> 50, "WindowCenter" -> {0, 0, 0} }, Options[ListPointPlot3D]];
 	
 ClusterPlot3D[{pos_, cm_, mcm_}, time_, opts:OptionsPattern[]] :=
 	Module[
-		{window, plot1, plot2, scale},
+		{window, windowCenter, plot1, plot2, scale},
 
 		window = OptionValue["Window"];
+		windowCenter = OptionValue["WindowCenter"];
 		scale = OptionValue["Scale"];
 		
 		plot1 = ListPointPlot3D[(scale * #)& /@ pos[[time, All]],
 					Sequence@@FilterRules[{opts}, Plot],
 					PlotStyle -> PointSize[0.008], 
-					PlotRange -> {{-window, window}, {-window, window}, {-window, window}}];
+					PlotRange -> {{-window + windowCenter[[1]], window + windowCenter[[1]]}, 
+									{-window + windowCenter[[2]], window + windowCenter[[2]]}, 
+										{-window + + windowCenter[[3]], window + + windowCenter[[3]]}}];
 		
 		plot2 = Graphics3D[{AbsolutePointSize[5], 
 					Red, Point[ scale cm[[time]]], 
