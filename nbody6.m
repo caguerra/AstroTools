@@ -218,6 +218,7 @@ nbody6Input[file_, opts:OptionsPattern[]] :=
 (* ::Subsection:: *)
 (*Read Ouput*)
 
+
 ReadOutput[file_] := 
 	Module[{strm, string, string1, template1, read1}, 
 		strm = OpenRead[file];
@@ -260,7 +261,7 @@ ReadOUT3[file_] :=
 	]
 
 
-readOUT33[file_] := 
+ReadOUT33[file_] := 
 	Module[{strm, NTAIL, MODEL, NK, endOfFile, reap},
 
 		strm = OpenRead[file, BinaryFormat -> True];
@@ -269,7 +270,7 @@ readOUT33[file_] :=
 		reap =  
 			Reap[
 				While[Last[endOfFile] =!= EndOfFile, 			
-					Sow[{NTAIL, MODEL, NK} = BinaryRead[strm, Table["Integer32", {4}]], "VARS"];
+					Sow[{NTAIL, MODEL, NK} = BinaryRead[strm, Table["Integer32", {3}]], "VARS"];
 					BinaryRead[strm, Table["Byte", {8}]];
 					Sow[BinaryRead[strm, Table["Real32", {NK}]], "AS"];
 					Sow[BinaryRead[strm, Table["Real32", {NTAIL}]], "BODYS"];
