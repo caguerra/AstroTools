@@ -166,7 +166,7 @@ VZROT::usage = "Z-velocity scaling factor (not used if VXROT = 0)."
 RTIDE::usage = "Unscaled tidal radius (#14 >= 2; otherwise copied to RSPH2)."
 SMAX::usage =  "Maximum time-step (factor of 2 commensurate with 1.0)."
 
-
+printASData::usage = "";
 
 
 
@@ -206,6 +206,30 @@ Options[nbody6Input] = {
 }
 
 
+ASDataString = "AS (1) = TTOT
+ AS (2) = FLOAT (NPAIRS)
+ AS (3) = RBAR
+ AS (4) = ZMBAR
+ AS (5) = RTIDE
+ AS (6) = TIDAL (4)
+ AS (7) = RDENS (1)
+ AS (8) = RDENS (2)
+ AS (9) = RDENS (3)
+ AS (10) = TTOT/TCR
+ AS (11) = TSTAR
+ AS (12) = VSTAR
+ AS (13) = RC
+ AS (14) = NC
+ AS (15) = VC
+ AS (16) = RHOM
+ AS (17) = CMAX
+ AS (18) = RSCALE
+ AS (19) = RSMIN
+ AS (20) = DMIN1"
+
+printASData := Print[ASDataString];
+
+
 nbody6Input[file_, opts:OptionsPattern[]] := 
 	Module[{}
 		
@@ -220,16 +244,16 @@ nbody6Input[file_, opts:OptionsPattern[]] :=
 
 
 ReadOutput[file_] := 
-	Module[{strm, string, string1, template1, read1}, 
+	Module[{strm, string, string1, template1, read1, scalings}, 
 		strm = OpenRead[file];
 		string = ReadList[strm, String];
 		Close[strm];
-
+		scalings = StringToNumbers /@ Flatten@StringCases[string[[1;;100]], "PHYSICAL SCALING:    R* ="~~r__~~"M* ="~~m__~~"V* ="~~v__~~"T* ="~~t__~~"<M> ="~~mm__~~"SU ="~~su__:> {r,m,v,t,mm,su}];
 		string1 = DeleteCases[StringCases[string, "#1"~~x___:>x], {}]; 
 		template1 = {5,6,6,7,5,7,6,7,6,6,7,5,6,8,8,9,7,7,6,6,6,6};
 		template1 = {1,0} + #& /@ Partition[Prepend[Accumulate[template1], 0], 2, 1];
 		read1 = StringToNumbers /@ First@StringTake[#, template1]&;
-		read1 /@ string1
+		{scalings, read1 /@ string1}
 
 	]
 
