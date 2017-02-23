@@ -184,7 +184,7 @@ Compile[{{mass,_Real,1},{pos,_Real,2},{vel,_Real,2}},
 
 FindBinaries[mass_,position_,velocity_] :=
 	Module[{pairs, binaries,energy,distance,squaredSpeed,aaxis},
-		{energy,distance,squaredSpeed,aaxis}=energyFromPairs[mass,position,velocity];
+		{energy,distance,squaredSpeed,aaxis} = EnergyFromPairs[mass,position,velocity];
 		pairs = Table[ Flatten[{i,Position[energy[[i]],Min[energy[[i]]]]}], {i,1,Length[mass]}];
 		binaries = Select[Gather[pairs,#1==Reverse[#2]&], Length[#]==2&][[All,All,1]];
 		{binaries, Extract[energy,binaries], Extract[distance,binaries], Extract[squaredSpeed,binaries], Extract[aaxis,binaries]}
