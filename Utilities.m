@@ -23,8 +23,10 @@ StringToNumbers::usage;
 TotalPotentialEnergy::usage = "TotalPotentialEnergy[pos_, vel_]";
 TotalKineticEnergy::usage = "TotalKineticEnergy[mass_, pos_]";
 VirialRadius::usage = "VirialRadius[mass_, pos_]"
+EnergyFromPairs::usage = ""
+FindBinaries::usage = ""
 
-(* Files *)
+(* Fileg *)
 StarlabSnapToNBody;
 
 (* Plots and simulations *)
@@ -97,6 +99,7 @@ StringToNumbers[list_List] := Internal`StringToDouble[#]& /@ list
 (* ::Subsection:: *)
 (*Calculations*)
 
+
 Clear[TotalKineticEnergy]
 
 (* Total kinetic energy at specific time *)
@@ -151,6 +154,42 @@ VirialRadius[mass_, pos_] := - 0.5 Total[mass] / TotalPotentialEnergy[mass, pos]
 
 (* Virial radius at all times *)
 VirialRadius[mass_, pos_] := - 0.5 (Total/@ mass) / TotalPotentialEnergy[mass, pos] /; Depth[mass] == 3 && Depth[pos] == 4
+
+
+
+EnergyFromPairs =
+Compile[{{mass,_Real,1},{pos,_Real,2},{vel,_Real,2}},
+	Block[{nmax, distance,squaredSpeed,massProduct,list,energy,BIG,aaxis},
+		nmax = Length@mass;
+		BIG=10.^6;
+		squaredSpeed=Table[0.,{i,1,nmax},{j,1,nmax}];
+		distance=Table[0.,{i,1,nmax},{j,1,nmax}];
+		energy=Table[0.,{i,1,nmax},{j,1,nmax}];
+		aaxis=Table[0.,{i,1,nmax},{j,1,nmax}];
+			Do[
+				If[i!=j,
+					distance[[i,j]]=(\[Sqrt]((pos[[i,1]]-pos[[j,1]])^2+(pos[[i,2]]-pos[[j,2]])^2+(pos[[i,3]]-pos[[j,3]])^2));
+					squaredSpeed[[i,j]]= ((vel[[i,1]]-vel[[j,1]])^2+(vel[[i,2]]-vel[[j,2]])^2+(vel[[i,3]]-vel[[j,3]])^2);
+					massProduct = mass[[i]]mass[[j]];
+					energy[[i,j]] = massProduct(0.5/(mass[[i]]+mass[[j]]) squaredSpeed[[i,j]]-1./distance[[i,j]]);
+					aaxis[[i,j]] = massProduct/(2 Abs[energy[[i,j]]]);
+				],
+				{i,1,nmax},{j,1,nmax}
+			];
+		{energy, distance, squaredSpeed, aaxis}
+	],
+	CompilationTarget->"C"
+];
+
+
+FindBinaries[mass_,position_,velocity_] :=
+	Module[{pairs, binaries,energy,distance,squaredSpeed,aaxis},
+		{energy,distance,squaredSpeed,aaxis}=energyFromPairs[mass,position,velocity];
+		pairs = Table[ Flatten[{i,Position[energy[[i]],Min[energy[[i]]]]}], {i,1,Length[mass]}];
+		binaries = Select[Gather[pairs,#1==Reverse[#2]&], Length[#]==2&][[All,All,1]];
+		{binaries, Extract[energy,binaries], Extract[distance,binaries], Extract[squaredSpeed,binaries], Extract[aaxis,binaries]}
+	];
+
 
 (* ::Subsection:: *)
 (*Plots*)
