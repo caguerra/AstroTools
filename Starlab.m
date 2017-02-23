@@ -119,7 +119,7 @@ SetAttributes[DynToXML, HoldFirst];
 
 Options[DynToXML] = {Path -> Automatic}
 
-DynToXML[data_, file_, opts:OptionsPattern[]]:=
+DynToXML[file_, opts:OptionsPattern[]]:=
 	Module[
 		{lines, line, strm, dir, k},
 		
@@ -155,15 +155,20 @@ DynToXML[data_, file_, opts:OptionsPattern[]]:=
 		WriteString[strm, "</System>"];
 		Close[strm];
 		
-		Print["Clearing data: ", TimeAndMem[]];
-		Clear[lines];
+		Print["Clearing lines var: ", TimeAndMem[]];
+		Clear[lines];		
 
 		Print["Importing XML: ", TimeAndMem[]];
-		data = Import["temp.xml", "XML"][[2,3]];
 		(*ImportString[data, "XML"]*)
+		Global`$DynData = Import["temp.xml", "XML"][[2,3]];
+		
+		Print["Generate MX: ", TimeAndMem[]];
+		DumpSave["dyn.mx", Global`$DynData];
 
-		DeleteFile["temp.xml"];
-		Print["end: ", TimeAndMem[]];
+		Print["Deleting temp var: ", TimeAndMem[]];
+		Clear[Global`$DynData];
+		
+		Print["DONE to end: ", TimeAndMem[]];
 		ResetDirectory[];
 		Return[0]
 
