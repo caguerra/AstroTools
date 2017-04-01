@@ -33,7 +33,7 @@ StarlabSnapToNBody;
 ScaledListPlot::usage = "ScaledListPlot[list_] ";
 ClusterPlot::usage = "ClusterPlot[{pos, cm, mcm}, t] plots the star cluster at time t"
 ClusterPlot3D::usage = "ClusterPlot3D[{pos, cm, mcm}, t] plots the stars cluster at time t"
-
+MinimalistHistogram::usage = "MinimalistHistogram[data, spec] make a histogram from data"
 
 $TimeScale
 
@@ -156,7 +156,7 @@ VirialRadius[mass_, pos_] := - 0.5 Total[mass] / TotalPotentialEnergy[mass, pos]
 VirialRadius[mass_, pos_] := - 0.5 (Total/@ mass) / TotalPotentialEnergy[mass, pos] /; Depth[mass] == 3 && Depth[pos] == 4
 
 
-
+()
 EnergyFromPairs =
 Compile[{{mass,_Real,1},{pos,_Real,2},{vel,_Real,2}},
 	Block[{nmax, distance,squaredSpeed,massProduct,list,energy,BIG,aaxis},
@@ -187,7 +187,8 @@ FindBinaries[mass_,position_,velocity_] :=
 		{energy,distance,squaredSpeed,aaxis} = EnergyFromPairs[mass,position,velocity];
 		pairs = Table[ Flatten[{i,Position[energy[[i]],Min[energy[[i]]]]}], {i,1,Length[mass]}];
 		binaries = Select[Gather[pairs,#1==Reverse[#2]&], Length[#]==2&][[All,All,1]];
-		{binaries, Extract[energy,binaries], Extract[distance,binaries], Extract[squaredSpeed,binaries], Extract[aaxis,binaries]}
+		{binaries, Extract[energy,binaries], Extract[distance,binaries], 
+			Extract[squaredSpeed,binaries], Extract[aaxis,binaries]}
 	];
 
 
@@ -303,6 +304,20 @@ ClusterPlot3D[{pos_, cm_, mcm_}, time_, opts:OptionsPattern[]] :=
 	]
 
 
+Clear[MinimalistHistogram];
+MinimalistHistogram[list_, {width_}, color:_?ColorQ:Black, opts___?Rule] := 
+	Module[{min, max, range, bins, histoX, histoY},
+		min = Min[list];
+		max = Max[list] + width;
+		range = Range[min, max, width];
+		bins = BinCounts[list, {min, max, width}];
+		histoX = Riffle[range, range]; 
+		histoY = Join[{0}, Riffle[bins, bins], {0}];
+		
+		Graphics[{color, Line[Transpose[{histoX, histoY}]]}, opts, 
+			Frame -> True, AspectRatio -> 1/GoldenRatio]
+		
+	]
 
 (* ::Subsection:: *)
 (*Files*)
