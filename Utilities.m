@@ -34,6 +34,7 @@ ScaledListPlot::usage = "ScaledListPlot[list_] ";
 ClusterPlot::usage = "ClusterPlot[{pos, cm, mcm}, t] plots the star cluster at time t"
 ClusterPlot3D::usage = "ClusterPlot3D[{pos, cm, mcm}, t] plots the stars cluster at time t"
 MinimalistHistogram::usage = "MinimalistHistogram[data, spec] make a histogram from data"
+ZoomGraphics::usage = "Zoom in two dimensional graphcis. Useful for cluster plots"
 
 $TimeScale
 
@@ -156,7 +157,6 @@ VirialRadius[mass_, pos_] := - 0.5 Total[mass] / TotalPotentialEnergy[mass, pos]
 VirialRadius[mass_, pos_] := - 0.5 (Total/@ mass) / TotalPotentialEnergy[mass, pos] /; Depth[mass] == 3 && Depth[pos] == 4
 
 
-()
 EnergyFromPairs =
 Compile[{{mass,_Real,1},{pos,_Real,2},{vel,_Real,2}},
 	Block[{nmax, distance,squaredSpeed,massProduct,list,energy,BIG,aaxis},
@@ -318,6 +318,31 @@ MinimalistHistogram[list_, {width_}, color:_?ColorQ:Black, opts___?Rule] :=
 			Frame -> True, AspectRatio -> 1/GoldenRatio]
 		
 	]
+
+ZoomGraphics[graph_Graphics] := 
+	With[
+		{gr = First[graph], 
+		opt = DeleteCases[Options[graph], PlotRange -> _], 
+		plr = PlotRange /. Options[graph, PlotRange], 
+    	rectangle = {Dashing[Small], Line[{#1, {First[#2], Last[#1]}, #2, {First[#1], Last[#2]}, #1}]} & }, 
+
+    	DynamicModule[
+    	{dragging = False, first, second, range = plr}, 
+    		Panel[
+    			EventHandler[
+    				Dynamic[
+    					Graphics[If[dragging, {gr, rectangle[first, second]}, gr], PlotRange -> range, Sequence @@ opt]
+    				], 
+      				{
+      					{"MouseDown", 1} :> (first = MousePosition["Graphics"]), 
+      					{"MouseDragged", 1} :> (dragging = True; second = MousePosition["Graphics"]), 
+      					{"MouseUp", 1} :> If[dragging, dragging = False; range = Transpose[{first, second}], range = plr]
+      				}
+      			]
+      		]
+      	]
+	]
+
 
 (* ::Subsection:: *)
 (*Files*)
