@@ -42,18 +42,6 @@ AccumulateFromCMNodes::usage;
 ExtractLeavesFromData::usage;
 ReadStarlabLogs::usage;
 
-
-(* Equivalence relations *)
-$MetersToParsec = 3.240779289469756`*^-17;
-$ParsecToAU = 206264.8062454803`;
-$SecondToMegaYear = 3.1709791983764584`*^-14;
-$JouleToErgs = 10^7;
-
-
-(* Astrophysical paramenters *)
-$GravitationalConstant = 6.67 * 10^-11;
-$SolarMass = 1.988 * 10^30;
-
 (* Other symbols *)
 ConversionFunction;
 

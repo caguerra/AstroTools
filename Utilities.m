@@ -36,11 +36,20 @@ ClusterPlot3D::usage = "ClusterPlot3D[{pos, cm, mcm}, t] plots the stars cluster
 MinimalistHistogram::usage = "MinimalistHistogram[data, spec] make a histogram from data"
 ZoomGraphics::usage = "Zoom in two dimensional graphcis. Useful for cluster plots"
 
+(* Equivalence relations *)
+$MetersToParsec = 3.240779289469756`*^-17;
+$SecondToMegaYear = 3.1709791983764584`*^-14;
+$JouleToErgs = 10^7;
+$ParsecToAU = 206264.8062454803`;
+
+(* Astrophysical paramenters *)
+$GravitationalConstant = 6.67 * 10^-11;
+$SolarMass = 1.988 * 10^30;
+
+(* Scaling factors *)
 $TimeScale
 
-
 Begin["`Private`"]
-
 
 (* ::Subsection:: *)
 (*Memory*)
@@ -81,7 +90,6 @@ DeleteOuts[mem_] :=
 
 (* ::Subsection:: *)
 (*Conversions*)
-
 
 StringToNumbers[string_] := 
 	Module[{strm, numbers},
@@ -181,7 +189,7 @@ Compile[{{mass,_Real,1},{pos,_Real,2},{vel,_Real,2}},
 	CompilationTarget->"C"
 ];
 
-
+(* statistical binaries ?*)
 FindBinaries[mass_,position_,velocity_] :=
 	Module[{pairs, binaries,energy,distance,squaredSpeed,aaxis},
 		{energy,distance,squaredSpeed,aaxis} = EnergyFromPairs[mass,position,velocity];
@@ -191,10 +199,68 @@ FindBinaries[mass_,position_,velocity_] :=
 			Extract[squaredSpeed,binaries], Extract[aaxis,binaries]}
 	];
 
+Clear[TwoBodyProperties];
+TwoBodyProperties[{{mass1_, pos1_, vel1_}, {mass2_, pos2_, vel2_}}] := 
+  	Module[{distance, relativeSpeed, massProduct, energy, majorAxis, 
+    totalMass, cm, vcm},
+   		distance = EuclideanDistance[pos2, pos1];
+   		relativeSpeed = EuclideanDistance[vel2, vel1];
+   		massProduct = mass1 * mass2;
+   		totalMass = mass1 + mass2;
+   		energy = massProduct ((0.5 relativeSpeed^2)/(mass1 + mass2 ) - 1./distance);
+   		majorAxis = massProduct/(2 Abs[energy]);
+   		cm = (mass1 pos1 + mass2 pos2)/totalMass;
+   		vcm = (mass1 vel1 + mass2 vel2)/totalMass;
+   		{totalMass, distance, relativeSpeed, cm, vcm, majorAxis, energy}
+   	];
+	
+Clear[InstantaneousMultiples];
+InstantaneousMultiples[id_, m_, x_, v_] :=
+ 	Module[{nearest, mutualNearest, singleRules, pairProperties,
+ 		negativeEnergyQ, binaries, binariesProperties, starOfSystemQ,
+ 		id2, m2, x2, v2, nearest1, nearest2, binaryRules, triples,
+ 		triplesProperties},
+  		
+  		(*--- Look for binaries ---*)
+  		nearest = Nearest[Thread[x -> id], x, 2];
+  		mutualNearest = 
+  			Select[Gather[nearest, #1 == Reverse[#2] &], Length[#] == 2 &][[All, All, 1]];
+  		singleRules = Dispatch[Thread[id -> Transpose[{m, x, v}]]];		
+  		pairProperties = TwoBodyProperties /@ (mutualNearest /. singleRules);
+  		negativeEnergyQ = Negative /@ pairProperties[[All, -1]];
+  		binaries = Pick[mutualNearest, negativeEnergyQ];
+  		binariesProperties = Pick[pairProperties, negativeEnergyQ];
+  		
+  		(*--- Look for triples ---*)
+  		starOfSystemQ = Replace[Replace[id, Thread[Flatten[binaries] -> True], 1], Except[True] -> False, 1];
+  		id2 = Pick[id, starOfSystemQ, False];
+  		m2 = Pick[m, starOfSystemQ, False];
+  		x2 = Pick[x, starOfSystemQ, False];
+  		v2 = Pick[v, starOfSystemQ, False];				
+  		nearest1 = Transpose[{id2, Nearest[Thread[binariesProperties[[All, 4]] -> binaries], x2, 1][[All, 1]]}];
+  		nearest2 = Transpose[{binaries, Nearest[Thread[x2 -> id2], binariesProperties[[All, 4]], 1][[All, 1]]}];										
+  		nearest = Join[nearest1, nearest2];	
+  		mutualNearest = Select[Gather[nearest, #1 === Reverse[#2] &], Length[#] == 2 &][[All, All, 1]];
+  		binaryRules = Thread[binaries -> binariesProperties[[All, {1, 4, 5}]]];
+  		pairProperties = TwoBodyProperties /@ (mutualNearest /. binaryRules /. singleRules);
+  		negativeEnergyQ = Negative /@ pairProperties[[All, -1]];
+  		triples = Pick[mutualNearest, negativeEnergyQ];
+  		triplesProperties = Pick[pairProperties, negativeEnergyQ];
+  		
+  		{{binaries, binariesProperties}, {triples, triplesProperties}}																	
+  	]
+
+permanentBinaries[multiples1_, multiples2_] := 
+	Module[{binaries, triples},
+		
+		binaries = Intersection[multiples1[[1,1]],multiples2[[1,1]]];
+		triples = Intersection[multiples1[[2,1]],multiples2[[2,1]]];
+	
+		{binaries, triples} 
+	]
 
 (* ::Subsection:: *)
 (*Plots*)
-
 
 Clear[ScaledListPlot];
 
@@ -257,27 +323,128 @@ ScaledListPlot[list:{{_?NumberQ..}..}, scale_, opts:OptionsPattern[]] := ScaledL
 
 Clear[ClusterPlot]
 
-Options[ClusterPlot] = Join[{"Proyection" -> {1,2}, "Scale" -> {1,1}, "Window" -> 50 }, Options[Plot]];
+Options[ClusterPlot] = 
+  	Join[{"Proyection" -> {1, 2}, "Scale" -> {1, 1}, "Singles" -> Automatic, "MultipleLabels" -> False,
+    		"Doubles" -> Automatic, "Triples" -> Automatic, "Cuadruples" -> Automatic}, Options[Graphics]];
+       
+ClusterPlot[pos : {{_?NumberQ, _?NumberQ, _?NumberQ} ..}, 
+  opts : OptionsPattern[]] := 
+ 	Module[{pos2, proy, scale, labels, singles, directives, primitives}, 
+  	
+  		proy = OptionValue["Proyection"]; 
+  		pos2 = pos[[All, proy]];
+  		scale = OptionValue["Scale"]; 
+  		singles = OptionValue["Singles"];
+  		labels = {{#2, None}, {#1, None}} & @@ (proy /. {1 -> "x", 2 -> "y", 3 -> "z"});
+  				
+  		If[singles === Automatic, 
+   			directives = {AbsolutePointSize[2], Blue}, 
+   			directives = singles 
+   		];	
+  		
+  		primitives = {If[MatchQ[directives, _List], Sequence @@ directives, directives], Point[pos2]};
+  		
+  		Graphics[primitives, Sequence @@ FilterRules[{opts}, Options[Graphics]],
+   				Frame -> True, AspectRatio -> Automatic, FrameLabel -> labels]
+  	]
+	
+ClusterPlot[ids : {_?NumberQ ..}, pos : {{_?NumberQ, _?NumberQ, _?NumberQ} ..}, opts : OptionsPattern[]] := 
+ 	Module[{pos2, proy, scale, labels, singles, directives, primitives, defaultDirectives, doubles, triples, 
+ 		cuadruples, multiples, rules, primitives2, primitives3, primitives4, primitives1, primitives0, multipleLabels}, 
+  
+  		proy = OptionValue["Proyection"]; 
+  		pos2 = pos[[All, proy]];
+  		scale = OptionValue["Scale"]; 
+  		multipleLabels = OptionValue["MultipleLabels"];
+  		labels = {{#2, None}, {#1, None}} & @@ (proy /. {1 -> "x", 2 -> "y", 3 -> "z"});
+  		singles = OptionValue["Singles"];
+  		doubles = OptionValue["Doubles"];
+  		triples = OptionValue["Triples"];
+  		cuadruples = OptionValue["Cuadruples"];
+  		defaultDirectives = {AbsolutePointSize[2], Blue};
+  		rules = Dispatch[Thread[ids -> pos2]];
+  		
+  		If[ doubles === Automatic && triples === Automatic && cuadruples === Automatic,
+   			If[ MatchQ[singles, {__Rule}],
+    				singles = Flatten[Map[If[MatchQ[#[[1]], _List], Thread[#, List, 1], #] &, singles], 1];
+    				primitives = 
+     					Join[defaultDirectives, 
+     						Flatten /@ (Transpose[{ids, Point /@ pos2}] /. singles /. {_Integer, p_} :> p)]
+    				,
+    				If[singles === Automatic, 
+     					directives = defaultDirectives, 
+     					directives = singles 
+     				];	
+    				primitives = {If[MatchQ[directives, _List], Sequence @@ directives, directives], Point[pos2]}
+    		]
+   			,
+   			doubles = doubles /. Automatic -> {};
+   			triples = triples /. Automatic -> {};
+   			cuadruples = cuadruples /. Automatic -> {};
+   			
+   			doubles = Flatten[Map[If[MatchQ[#[[1]], x_List /; ArrayDepth[x] > 1], Thread[#, List, 1], #] &, doubles], 1];
+   			triples = Flatten[Map[If[MatchQ[#[[1]], x_List /; ArrayDepth[x] > 1], Thread[#, List, 1], #] &, triples], 1];
+   			cuadruples = Flatten[Map[If[MatchQ[#[[1]], x_List /; ArrayDepth[x] > 1], Thread[#, List, 1], #] &, cuadruples], 1];
+   			
+   			multiples = Union @ Flatten[Join[doubles[[All, 1]], triples[[All, 1]], cuadruples[[All, 1]]]];
+   
+   			If[ multipleLabels,
+    				primitives2 = {If[Head[#2] === List, Sequence @@ #2, #2], 
+    					Sequence @@ ({Line[#], Map[Tooltip[Point[#], ToString[#]] &, #]} & @ Flatten[#1] /. rules)} & @@@ doubles;
+    				primitives3 = {If[Head[#2] === List, Sequence @@ #2, #2], 
+    					Sequence @@ ({Line[#], Map[Tooltip[Point[#], ToString[#]] &, #]} & @ Flatten[#1] /. rules)} & @@@ triples;
+    				primitives4 = {If[Head[#2] === List, Sequence @@ #2, #2], 
+    					Sequence @@ ({Line[#], Map[Tooltip[Point[#], ToString[#]] &, #]} & @ Flatten[#1] /. rules)} & @@@ cuadruples;
+    				,
+    				primitives2 = {If[Head[#2] === List, Sequence @@ #2, #2], 
+    					Sequence @@ ({Line[#], Point[#]} & @ Flatten[#1] /. rules)} & @@@ doubles;
+    				primitives3 = {If[Head[#2] === List, Sequence @@ #2, #2], 
+    					Sequence @@ ({Line[#], Point[#]} & @ Flatten[#1] /. rules)} & @@@ triples;
+    				primitives4 = {If[Head[#2] === List, Sequence @@ #2, #2], 
+    					Sequence @@ ({Line[#], Point[#]} & @ Flatten[#1] /. rules)} & @@@ cuadruples;
+    			];	
+   						
+   			If[ MatchQ[singles, {__Rule}],
+    				singles = Flatten[Map[If[MatchQ[#[[1]], _List], Thread[#, List, 1], #] &, singles], 1];
+    				primitives0 = Join[defaultDirectives, Point /@ Complement[ids, multiples] /. rules];
+    				primitives1 = {If[Head[#2] === List, Sequence @@ #2, #2], Point @ #1 /. rules} & @@@ singles;
+    				primitives = {primitives0, primitives1, primitives2, primitives3, primitives4};
+    				,
+    				If[singles === Automatic, 
+     					directives = defaultDirectives, 
+     					directives = singles 
+     				];
+    				primitives0 = Join[directives, Point /@ ids /. rules];
+    				primitives = {primitives0, primitives2, primitives3, primitives4};				
+    			]
+   		];
+  
+  		Graphics[primitives, 
+  			Sequence @@ FilterRules[{opts}, Options[Graphics]],
+   				Frame -> True, AspectRatio -> Automatic, FrameLabel -> labels]
+  	]
+	
+ClusterPlot[mass: {_?NumberQ ..}, pos: {{_?NumberQ, _?NumberQ} ..}, 
+  opts : OptionsPattern[]] := 
+ 	Module[{}, 
+  		Print["soon"]
+  	]
+	
+ClusterPlot[ids: {_?NumberQ ..}, mass: {_?NumberQ ..}, 
+  pos : {{_?NumberQ, _?NumberQ} ..}, opts : OptionsPattern[]] := 
+ 	Module[{}, 
+  		Print["soon"]
+  	]
 
-ClusterPlot[{pos_, cm_, mcm_}, time_, opts:OptionsPattern[]] :=
-	Module[
-		{window, proy, plot1, plot2, scale},
-
-		window = OptionValue["Window"];
-		proy = OptionValue["Proyection"];
-		scale = OptionValue["Scale"];
-		
-		plot1 = ScaledListPlot[pos[[time, All, proy]], scale, 
-					Sequence@@FilterRules[{opts}, Plot],
-					Joined -> False, GridLines -> None, PlotStyle -> PointSize[0.008], 
-					Axes -> False, PlotRange -> {{-window, window}, {-window, window}}];
-		
-		plot2 = Graphics[{AbsolutePointSize[5], 
-					Red, Point[ scale cm[[time, proy]]], 
-					Green, Point[ scale mcm[[time, proy]]]}];
-		
-		Show[plot1, plot2]
-	]
+(* -- example with mass --
+Graphics[{AbsoluteThickness[0.6], 
+  MapThread[{#3, Circle[#1, Scaled[#2]]} & , 
+       {xs[[time, 1 ;; 100, {1, 2}]], 0.2*bodys[[time, 1 ;; 100]], 
+         bodys[[300, 1 ;; 100]]*$MassScale /. {x_ /; x < 1 :> Black, 
+             x_ /; Inequality[1, Less, x, LessEqual, 3] :> Blue, 
+      x_ /; x > 3 :> Red}}]}, 
+   Frame -> True, PlotRange -> {{-200, 200}, {-200, 200}}]
+*)
 
 Options[ClusterPlot3D] = Join[{"Scale" -> {1, 1, 1}, "Window" -> 50, "WindowCenter" -> {0, 0, 0} }, Options[ListPointPlot3D]];
 	
@@ -314,7 +481,7 @@ MinimalistHistogram[list_, {width_}, color:_?ColorQ:Black, opts___?Rule] :=
 		histoX = Riffle[range, range]; 
 		histoY = Join[{0}, Riffle[bins, bins], {0}];
 		
-		Graphics[{color, Line[Transpose[{histoX, histoY}]]}, opts, 
+		Graphics[{color, Line[Transpose[{histoX, histoY}]]}, Sequence@@{opts}, 
 			Frame -> True, AspectRatio -> 1/GoldenRatio]
 		
 	]
