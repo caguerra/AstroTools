@@ -25,6 +25,8 @@ TotalKineticEnergy::usage = "TotalKineticEnergy[mass_, pos_]";
 VirialRadius::usage = "VirialRadius[mass_, pos_]"
 EnergyFromPairs::usage = ""
 FindBinaries::usage = ""
+InstantaneousMultiples::usage = ""
+PermanentBinaries::usage = ""
 
 (* Fileg *)
 StarlabSnapToNBody;
@@ -250,7 +252,7 @@ InstantaneousMultiples[id_, m_, x_, v_] :=
   		{{binaries, binariesProperties}, {triples, triplesProperties}}																	
   	]
 
-permanentBinaries[multiples1_, multiples2_] := 
+PermanentBinaries[multiples1_, multiples2_] := 
 	Module[{binaries, triples},
 		
 		binaries = Intersection[multiples1[[1,1]],multiples2[[1,1]]];
