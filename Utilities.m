@@ -27,6 +27,8 @@ EnergyFromPairs::usage = ""
 FindBinaries::usage = ""
 InstantaneousMultiples::usage = ""
 PermanentBinaries::usage = ""
+DensityCenter::usage = "DensityCenter[id, mass, pos] computes the density center from snapshot with (id, mass, pos) at given instant. It uses six neighboorhoods"
+LagrangianRadii::usage
 
 (* Fileg *)
 StarlabSnapToNBody;
@@ -110,6 +112,28 @@ StringToNumbers[list_List] := Internal`StringToDouble[#]& /@ list
 (* ::Subsection:: *)
 (*Calculations*)
 
+Clear[DensityCenter];
+DensityCenter[id_, mass_, pos_]:=
+	Module[
+		{massRules, posRules, nearestFunction, density},
+		massRules = Dispatch@Thread[id -> mass];
+		posRules = Dispatch@Thread[id -> pos];
+		nearestFunction = Nearest[MapThread[Rule,{pos, id}]];
+		density = 
+			With[{neighborhood = Rest[nearestFunction[#,7]]}, 
+				Total[neighborhood /. massRules]/EuclideanDistance[#, Last[neighborhood] /. posRules]^3]& /@ pos;
+		Total[density*pos] / Total[density]
+	]
+
+Clear[LagrangianRadii];
+LagrangianRadii[mass_, position_, densityCenter_, radii_:Range[0, 1.0, 0.1]]:=
+	Module[{v1, v2},
+		v1 = SortBy[Transpose[{mass, Norm[# - densityCenter]& /@ position}], Last];
+		v2 = Transpose[{Accumulate[v1[[All,1]]], v1[[All,2]]}];
+		If[#!={}, #[[-1,-1]], Missing[]]& /@ (Cases[v2, {x_, d_} /; #1 < x <= #2]& @@@ Partition[radii, 2, 1])
+	]
+	
+	
 
 Clear[TotalKineticEnergy]
 
@@ -221,7 +245,7 @@ InstantaneousMultiples[id_, m_, x_, v_] :=
  	Module[{nearest, mutualNearest, singleRules, pairProperties,
  		negativeEnergyQ, binaries, binariesProperties, starOfSystemQ,
  		id2, m2, x2, v2, nearest1, nearest2, binaryRules, triples,
- 		triplesProperties},
+ 		triplesProperties, triplesRules, quadruples, quadruplesProperties},
   		
   		(*--- Look for binaries ---*)
   		nearest = Nearest[Thread[x -> id], x, 2];
@@ -234,22 +258,49 @@ InstantaneousMultiples[id_, m_, x_, v_] :=
   		binariesProperties = Pick[pairProperties, negativeEnergyQ];
   		
   		(*--- Look for triples ---*)
-  		starOfSystemQ = Replace[Replace[id, Thread[Flatten[binaries] -> True], 1], Except[True] -> False, 1];
+  		If[Length[binaries]!=0,
+	  		starOfSystemQ = Replace[Replace[id, Thread[Flatten[binaries] -> True], 1], Except[True] -> False, 1];
+	  		id2 = Pick[id, starOfSystemQ, False];
+	  		m2 = Pick[m, starOfSystemQ, False];
+	  		x2 = Pick[x, starOfSystemQ, False];
+	  		v2 = Pick[v, starOfSystemQ, False];		
+	  		nearest1 = Transpose[{id2, Nearest[Thread[binariesProperties[[All, 4]] -> binaries], x2, 1][[All, 1]]}];
+	  		nearest2 = Transpose[{binaries, Nearest[Thread[x2 -> id2], binariesProperties[[All, 4]], 1][[All, 1]]}];										
+	  		nearest = Join[nearest1, nearest2];	
+	  		mutualNearest = Select[Gather[nearest, #1 === Reverse[#2] &], Length[#] == 2 &][[All, All, 1]];
+	  		binaryRules = Thread[binaries -> binariesProperties[[All, {1, 4, 5}]]];
+	  		pairProperties = TwoBodyProperties /@ (mutualNearest /. binaryRules /. singleRules);
+	  		negativeEnergyQ = Negative /@ pairProperties[[All, -1]];
+	  		triples = Pick[mutualNearest, negativeEnergyQ];
+	  		triplesProperties = Pick[pairProperties, negativeEnergyQ]
+  			,
+  			triples = {};
+  			triplesProperties = {}
+  		];
+  		
+  		(* Look for quadruples *)
+  		If[Length[triples]!=0,
+  		starOfSystemQ = Replace[Replace[id, Thread[Union[Flatten[Join[binaries, triples]]] -> True], 1], Except[True] -> False, 1];
   		id2 = Pick[id, starOfSystemQ, False];
   		m2 = Pick[m, starOfSystemQ, False];
   		x2 = Pick[x, starOfSystemQ, False];
-  		v2 = Pick[v, starOfSystemQ, False];				
-  		nearest1 = Transpose[{id2, Nearest[Thread[binariesProperties[[All, 4]] -> binaries], x2, 1][[All, 1]]}];
-  		nearest2 = Transpose[{binaries, Nearest[Thread[x2 -> id2], binariesProperties[[All, 4]], 1][[All, 1]]}];										
+  		v2 = Pick[v, starOfSystemQ, False];	  		
+  		nearest1 = Transpose[{id2, Nearest[Thread[triplesProperties[[All, 4]] -> triples], x2, 1][[All, 1]]}];
+  		nearest2 = Transpose[{triples, Nearest[Thread[x2 -> id2], triplesProperties[[All, 4]], 1][[All, 1]]}];
+  		
   		nearest = Join[nearest1, nearest2];	
   		mutualNearest = Select[Gather[nearest, #1 === Reverse[#2] &], Length[#] == 2 &][[All, All, 1]];
-  		binaryRules = Thread[binaries -> binariesProperties[[All, {1, 4, 5}]]];
-  		pairProperties = TwoBodyProperties /@ (mutualNearest /. binaryRules /. singleRules);
+  		triplesRules = Thread[triples -> triplesProperties[[All, {1, 4, 5}]]];
+  		pairProperties = TwoBodyProperties /@ (mutualNearest /. triplesRules /. singleRules);
   		negativeEnergyQ = Negative /@ pairProperties[[All, -1]];
-  		triples = Pick[mutualNearest, negativeEnergyQ];
-  		triplesProperties = Pick[pairProperties, negativeEnergyQ];
-  		
-  		{{binaries, binariesProperties}, {triples, triplesProperties}}																	
+  		quadruples = Pick[mutualNearest, negativeEnergyQ];
+  		quadruplesProperties = Pick[pairProperties, negativeEnergyQ]
+  		,
+  		quadruples = {};
+  		quadruplesProperties = {}
+  		];
+  			
+  		{{binaries, binariesProperties}, {triples, triplesProperties}, {quadruples, quadruplesProperties}}																	
   	]
 
 PermanentBinaries[multiples1_, multiples2_] := 
@@ -327,15 +378,15 @@ Clear[ClusterPlot]
 
 Options[ClusterPlot] = 
   	Join[{"Proyection" -> {1, 2}, "Scale" -> {1, 1}, "Singles" -> Automatic, "MultipleLabels" -> False,
-    		"Doubles" -> Automatic, "Triples" -> Automatic, "Cuadruples" -> Automatic}, Options[Graphics]];
+    		"Doubles" -> Automatic, "Triples" -> Automatic, "Quadruples" -> Automatic}, Options[Graphics]];
        
 ClusterPlot[pos : {{_?NumberQ, _?NumberQ, _?NumberQ} ..}, 
   opts : OptionsPattern[]] := 
  	Module[{pos2, proy, scale, labels, singles, directives, primitives}, 
   	
-  		proy = OptionValue["Proyection"]; 
-  		pos2 = pos[[All, proy]];
-  		scale = OptionValue["Scale"]; 
+  		proy = OptionValue["Proyection"];
+  		scale = OptionValue["Scale"];  
+  		pos2 = If[scale =!= {1,1}, (scale * #)& /@ pos[[All, proy]], pos[[All, proy]]];
   		singles = OptionValue["Singles"];
   		labels = {{#2, None}, {#1, None}} & @@ (proy /. {1 -> "x", 2 -> "y", 3 -> "z"});
   				
@@ -354,15 +405,15 @@ ClusterPlot[ids : {_?NumberQ ..}, pos : {{_?NumberQ, _?NumberQ, _?NumberQ} ..}, 
  	Module[{pos2, proy, scale, labels, singles, directives, primitives, defaultDirectives, doubles, triples, 
  		cuadruples, multiples, rules, primitives2, primitives3, primitives4, primitives1, primitives0, multipleLabels}, 
   
-  		proy = OptionValue["Proyection"]; 
-  		pos2 = pos[[All, proy]];
-  		scale = OptionValue["Scale"]; 
+  		proy = OptionValue["Proyection"];
+  		scale = OptionValue["Scale"];  
+  		pos2 = If[scale == {1,1}, pos[[All, proy]], (scale * #)& /@ pos[[All, proy]]];
   		multipleLabels = OptionValue["MultipleLabels"];
   		labels = {{#2, None}, {#1, None}} & @@ (proy /. {1 -> "x", 2 -> "y", 3 -> "z"});
   		singles = OptionValue["Singles"];
   		doubles = OptionValue["Doubles"];
   		triples = OptionValue["Triples"];
-  		cuadruples = OptionValue["Cuadruples"];
+  		cuadruples = OptionValue["Quadruples"];
   		defaultDirectives = {AbsolutePointSize[2], Blue};
   		rules = Dispatch[Thread[ids -> pos2]];
   		
