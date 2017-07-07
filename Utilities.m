@@ -15,6 +15,8 @@ BeginPackage["AstroTools`Utilities`"]
 TimeAndMem::usage;
 DeleteOuts::usage;
 PrintArrayInfo::usage;
+BinarySerializeSave::usage;
+BinaryDeserializeGet::usage;
 
 (* Convertions *)
 StringToNumbers::usage;
@@ -89,8 +91,21 @@ DeleteOuts[mem_] :=
 		Protect[Out];
 
 		Print["session mem: ", memToString[MemoryInUse[]] ];	
-	]
+	];
 
+BinarySerializeSave[expr_, fileName_] :=
+	Module[{bin, file, ow},
+    	bin = BinarySerialize[expr];
+    	file = CreateFile[fileName];
+    	ow = OpenWrite[file, BinaryFormat -> True];
+    	BinaryWrite[ow, bin];
+    	Close[ow];
+    ];
+    
+
+BinaryDeserializeGet[fileName_] := 
+	BinaryDeserialize[ByteArray[BinaryReadList[fileName, "Byte"]]]
+    
 
 (* ::Subsection:: *)
 (*Conversions*)
@@ -526,16 +541,25 @@ ClusterPlot3D[{pos_, cm_, mcm_}, time_, opts:OptionsPattern[]] :=
 
 
 Clear[MinimalistHistogram];
-MinimalistHistogram[list_, {width_}, color:_?ColorQ:Black, opts___?Rule] := 
-	Module[{min, max, range, bins, histoX, histoY},
+Options[MinimalistHistogram] = Join[{"LineColor"-> Black, "Normalization" -> "Counts"}, Options[Graphics]];
+
+MinimalistHistogram[list_, {width_}, opts:OptionsPattern[]] := 
+	Module[{min, max, range, bins, histoX, histoY, normalization},
 		min = Min[list];
 		max = Max[list] + width;
 		range = Range[min, max, width];
 		bins = BinCounts[list, {min, max, width}];
+		normalization = OptionValue["Normalization"];
+		bins = 
+			Which[
+				normalization === "Counts", bins,
+				normalization === "Max", bins/Max[bins]
+			];
+		
 		histoX = Riffle[range, range]; 
 		histoY = Join[{0}, Riffle[bins, bins], {0}];
 		
-		Graphics[{color, Line[Transpose[{histoX, histoY}]]}, Sequence@@{opts}, 
+		Graphics[{OptionValue["LineColor"], Line[Transpose[{histoX, histoY}]]}, Sequence@@FilterRules[{opts}, Options[Graphics]], 
 			Frame -> True, AspectRatio -> 1/GoldenRatio]
 		
 	]
