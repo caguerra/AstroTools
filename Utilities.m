@@ -135,7 +135,7 @@ DensityCenter[id_, mass_, pos_]:=
 		posRules = Dispatch@Thread[id -> pos];
 		nearestFunction = Nearest[MapThread[Rule,{pos, id}]];
 		density = 
-			With[{neighborhood = Rest[nearestFunction[#,7]]}, 
+			With[{neighborhood = Rest[nearestFunction[#,12]]}, 
 				Total[neighborhood /. massRules]/EuclideanDistance[#, Last[neighborhood] /. posRules]^3]& /@ pos;
 		Total[density*pos] / Total[density]
 	]
@@ -303,7 +303,7 @@ InstantaneousMultiples[id_, m_, x_, v_] :=
   		nearest1 = Transpose[{id2, Nearest[Thread[triplesProperties[[All, 4]] -> triples], x2, 1][[All, 1]]}];
   		nearest2 = Transpose[{triples, Nearest[Thread[x2 -> id2], triplesProperties[[All, 4]], 1][[All, 1]]}];
   		nearest3 = If[Length[binaries] > 1, Nearest[Thread[binariesProperties[[All, 4]] -> binaries], binariesProperties[[All, 4]], 2], {}];
-  		Print[nearest3];
+
   		nearest = Join[nearest1, nearest2, nearest3];	
   		mutualNearest = Select[Gather[nearest, #1 === Reverse[#2] &], Length[#] == 2 &][[All, All, 1]];
   		triplesRules = Thread[triples -> triplesProperties[[All, {1, 4, 5}]]];
@@ -544,16 +544,18 @@ Clear[MinimalistHistogram];
 Options[MinimalistHistogram] = Join[{"LineColor"-> Black, "Normalization" -> "Counts"}, Options[Graphics]];
 
 MinimalistHistogram[list_, {width_}, opts:OptionsPattern[]] := 
-	Module[{min, max, range, bins, histoX, histoY, normalization},
+	Module[{min, max, range, bins, histoX, histoY, normalization, area},
 		min = Min[list];
 		max = Max[list] + width;
 		range = Range[min, max, width];
 		bins = BinCounts[list, {min, max, width}];
+		area = Total[bins]*width;
 		normalization = OptionValue["Normalization"];
 		bins = 
 			Which[
 				normalization === "Counts", bins,
-				normalization === "Max", bins/Max[bins]
+				normalization === "Max", bins/Max[bins],
+				normalization === "PDF", bins/area
 			];
 		
 		histoX = Riffle[range, range]; 
