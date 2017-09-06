@@ -12,7 +12,7 @@ BeginPackage["AstroTools`nbody6`", {"AstroTools`Utilities`"}]
 
 
 ReadOutput::usage = ""
-ReadOUT3::usage = ""
+ReadOUT3::usage = "Reads OUT3 file from nbody6. \n Options examples: \n\t\"Variables\" -> {\"BODYS\", \"XS\", \"VS\", \"NAME\"} \n\t\"Snapshots\" -> {1,50,100,500}}"
 ReadOUT33::usage = ""
 ReadESC::usage = ""
 
@@ -257,37 +257,72 @@ ReadOutput[file_] :=
 
 	]
 
+Clear[ReadOUT3]
 
-ReadOUT3[file_] := 
-	Module[{strm, NTOT, MODEL, NRUN, NK, endOfFile, reap},
+Options[ReadOUT3] = {"Variables" -> {"BODYS", "XS", "VS", "NAME"}, "Snapshots" -> All}
 
+ReadOUT3[file_, OptionsPattern[]] := 
+	Module[{strm, NTOT, MODEL, NRUN, NK, endOfFile, reap, vars, snapshots, count},
+
+		vars = OptionValue["Variables"] /. All -> {"VARS", "AS", "BODYS", "XS", "VS", "NAME"};
+		snapshots = OptionValue["Snapshots"];
 		strm = OpenRead[file, BinaryFormat -> True];
 		endOfFile = BinaryRead[strm, Table["Byte", {4}]];
-
+		count = 1; 
+		
 		reap =  
 			Reap[
-				While[Last[endOfFile] =!= EndOfFile, 			
-					Sow[{NTOT, MODEL, NRUN, NK} = BinaryRead[strm, Table["Integer32", {4}]], "VARS"];
-					BinaryRead[strm, Table["Byte", {8}]];
-					Sow[BinaryRead[strm, Table["Real32", {NK}]], "AS"];
-					Sow[BinaryRead[strm, Table["Real32", {NTOT}]], "BODYS"];
-					Sow[BinaryRead[strm, Table["Real32", {3*NTOT}]], "XS"];
-					Sow[BinaryRead[strm, Table["Real32", {3*NTOT}]], "VS"];
-					Sow[BinaryRead[strm, Table["Integer32",{NTOT}]], "NAME"];
-					BinaryRead[strm, Table["Byte", {4}]];
-					endOfFile = BinaryRead[strm, Table["Byte", {4}]];
+				Switch[snapshots,
+					All,
+						While[Last[endOfFile] =!= EndOfFile, 	
+							Sow[{NTOT, MODEL, NRUN, NK} = BinaryRead[strm, Table["Integer32", {4}]], "VARS"];
+							BinaryRead[strm, Table["Byte", {8}]];
+							Sow[BinaryRead[strm, Table["Real32", {NK}]], "AS"];
+							Sow[BinaryRead[strm, Table["Real32", {NTOT}]], "BODYS"];
+							Sow[BinaryRead[strm, Table["Real32", {3*NTOT}]], "XS"];
+							Sow[BinaryRead[strm, Table["Real32", {3*NTOT}]], "VS"];
+							Sow[BinaryRead[strm, Table["Integer32",{NTOT}]], "NAME"];
+							BinaryRead[strm, Table["Byte", {4}]];
+							endOfFile = BinaryRead[strm, Table["Byte", {4}]];	
+						],						
+					_List,
+						While[Last[endOfFile] =!= EndOfFile && count <= Last[snapshots], 	
+							If[MemberQ[snapshots, count],
+								Sow[{NTOT, MODEL, NRUN, NK} = BinaryRead[strm, Table["Integer32", {4}]], "VARS"];
+								BinaryRead[strm, Table["Byte", {8}]];
+								Sow[BinaryRead[strm, Table["Real32", {NK}]], "AS"];
+								Sow[BinaryRead[strm, Table["Real32", {NTOT}]], "BODYS"];
+								Sow[BinaryRead[strm, Table["Real32", {3*NTOT}]], "XS"];
+								Sow[BinaryRead[strm, Table["Real32", {3*NTOT}]], "VS"];
+								Sow[BinaryRead[strm, Table["Integer32",{NTOT}]], "NAME"];
+								BinaryRead[strm, Table["Byte", {4}]];
+								endOfFile = BinaryRead[strm, Table["Byte", {4}]];
+								count = count + 1
+								,
+								{NTOT, MODEL, NRUN, NK} = BinaryRead[strm, Table["Integer32", {4}]];
+								Skip[strm, "Byte", 12 + 4 NK + 32 NTOT];
+								endOfFile = BinaryRead[strm, Table["Byte", {4}]];
+								count = count + 1
+							]
+						],
+					_, $Failed
 				],
-			{"VARS", "AS", "BODYS", "XS", "VS", "NAME"}
-		];
+				vars
+			];
 
 		Close[strm];
 		reap[[-1]]
 	]
 
 
-ReadOUT33[file_] := 
-	Module[{strm, NTAIL, MODEL, NK, endOfFile, reap},
+Clear[ReadOUT33]
 
+Options[ReadOUT33] = {"Variables" -> {"BODYS", "XS", "VS", "NAME"}}
+
+ReadOUT33[file_, OptionsPattern[]] := 
+	Module[{strm, NTAIL, MODEL, NK, endOfFile, reap, vars},
+
+		vars = OptionValue["Variables"] /. All -> {"VARS", "AS", "BODYS", "XS", "VS", "NAME"};
 		strm = OpenRead[file, BinaryFormat -> True];
 		endOfFile = BinaryRead[strm, Table["Byte", {4}]];
 
@@ -304,7 +339,7 @@ ReadOUT33[file_] :=
 					BinaryRead[strm, Table["Byte", {4}]];
 					endOfFile = BinaryRead[strm, Table["Byte", {4}]];
 				],
-			{"VARS", "AS", "BODYS", "XS", "VS", "NAME"}
+				vars
 		];
 
 		Close[strm];
