@@ -78,17 +78,28 @@ SetAttributes[PrintArrayInfo, HoldAll];
 
 PrintArrayInfo[a_] := Print["Length: ", Length[a], " ", "MEM: ", memToString[ByteCount[a]] ];
 
-DeleteOuts[mem_] := 
+Clear[DeleteOuts];
+
+DeleteOuts[memInMB_:500] := 
 	Module[
-		{outs},
+		{outs, boole},
 
 		Print["session mem: ", memToString[MemoryInUse[]] ];
 
-		outs = Cases[Table[{k, ByteCount[Out[k]]/1024./1024.}, {k,346}], {_,m_} /; m > mem][[All,1]]; 
+		outs = Cases[Table[{k, ByteCount[Out[k]]/1024./1024.}, {k, $Line}], {_,m_} /; m > memInMB]; 
+		
+		If[outs == {}, 
+			Print["No Out[] greater than ", ToString[memInMB], "MB"]; Return[], 
+			Print["Out with mem greater than ", ToString[memInMB], "MP: ", Rule@@@outs] ];
 
-		Unprotect[Out];
-		Do[Out[out]=., {out,outs}];
-		Protect[Out];
+		boole = ChoiceDialog["Sure you want to delete Outs?"];
+ 		If[ boole === True,
+ 			Print["Deleting outputs ..."];
+			Unprotect[Out];
+			Do[Out[out]=., {out, outs[[All,1]]}];
+			Protect[Out],
+			Print["Canceled"]
+		];
 
 		Print["session mem: ", memToString[MemoryInUse[]] ];	
 	];
