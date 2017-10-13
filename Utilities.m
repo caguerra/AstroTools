@@ -29,7 +29,8 @@ EnergyFromPairs::usage = ""
 FindBinaries::usage = ""
 InstantaneousMultiples::usage = ""
 PermanentBinaries::usage = ""
-DensityCenter::usage = "DensityCenter[id, mass, pos] computes the density center from snapshot with (id, mass, pos) at given instant. It uses six neighboorhoods"
+DensityCenter::usage = "DensityCenter[id, mass, pos] computes the density center from snapshot with (id, mass, pos) at given instant. It uses 12 neighboorhoods"
+NeighborhoodDensity::usage = "DensityCenter[id, mass, pos] computes the density from snapshot with (id, mass, pos) at given instant. It uses 12 neighboorhoods"
 LagrangianRadii::usage
 
 (* Fileg *)
@@ -137,6 +138,19 @@ StringToNumbers[list_List] := Internal`StringToDouble[#]& /@ list
 
 (* ::Subsection:: *)
 (*Calculations*)
+
+Clear[NeighborhoodDensity] 
+NeighborhoodDensity[id_, mass_, pos_] :=
+	Module[
+		{massRules, posRules, nearestFunction, density},
+		massRules = Dispatch@Thread[id -> mass];
+		posRules = Dispatch@Thread[id -> pos];
+		nearestFunction = Nearest[MapThread[Rule,{pos, id}]];
+		density = 
+			With[{neighborhood = Rest[nearestFunction[#,12]]}, 
+				(3./(4.*Pi)) Total[neighborhood /. massRules] / EuclideanDistance[#, Last[neighborhood] /. posRules]^3]& /@ pos
+	]
+
 
 Clear[DensityCenter];
 DensityCenter[id_, mass_, pos_]:=
