@@ -32,6 +32,7 @@ PermanentBinaries::usage = ""
 DensityCenter::usage = "DensityCenter[id, mass, pos] computes the density center from snapshot with (id, mass, pos) at given instant. It uses 12 neighboorhoods"
 NeighborhoodDensity::usage = "DensityCenter[id, mass, pos] computes the density from snapshot with (id, mass, pos) at given instant. It uses 12 neighboorhoods"
 LagrangianRadii::usage
+LagrangianRadiiAndMasses::usage
 
 (* Fileg *)
 StarlabSnapToNBody;
@@ -168,12 +169,21 @@ DensityCenter[id_, mass_, pos_]:=
 Clear[LagrangianRadii];
 LagrangianRadii[mass_, position_, densityCenter_, radii_:Range[0, 1.0, 0.1]]:=
 	Module[{v1, v2},
+		(* Sort masses by distance to density center *)
 		v1 = SortBy[Transpose[{mass, Norm[# - densityCenter]& /@ position}], Last];
+		(* Accumulate masses *)
 		v2 = Transpose[{Accumulate[v1[[All,1]]], v1[[All,2]]}];
 		If[#!={}, #[[-1,-1]], Missing[]]& /@ (Cases[v2, {x_, d_} /; #1 < x <= #2]& @@@ Partition[radii, 2, 1])
 	]
 	
-	
+Clear[LagrangianRadii];
+LagrangianRadiiAndMasses[mass_, position_, densityCenter_, radii_:Range[0, 1.0, 0.1]]:=
+	Module[{v1, v2},
+		v1 = SortBy[Transpose[{mass, Norm[# - densityCenter]& /@ position}], Last];
+		v2 = Transpose[{Accumulate[v1[[All,1]]], v1[[All,2]]}];
+		If[#!={}, #[[-1]], Missing[]]& /@ (Cases[v2, {x_, d_} /; #1 < x <= #2]& @@@ Partition[radii, 2, 1])
+	]
+
 
 Clear[TotalKineticEnergy]
 
