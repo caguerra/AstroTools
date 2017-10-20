@@ -176,12 +176,12 @@ LagrangianRadii[mass_, position_, densityCenter_, radii_:Range[0, 1.0, 0.1]]:=
 		If[#!={}, #[[-1,-1]], Missing[]]& /@ (Cases[v2, {x_, d_} /; #1 < x <= #2]& @@@ Partition[radii, 2, 1])
 	]
 	
-Clear[LagrangianRadii];
+Clear[LagrangianRadiiAndMasses];
 LagrangianRadiiAndMasses[mass_, position_, densityCenter_, radii_:Range[0, 1.0, 0.1]]:=
 	Module[{v1, v2},
 		v1 = SortBy[Transpose[{mass, Norm[# - densityCenter]& /@ position}], Last];
 		v2 = Transpose[{Accumulate[v1[[All,1]]], v1[[All,2]]}];
-		If[#!={}, #[[-1]], Missing[]]& /@ (Cases[v2, {x_, d_} /; #1 < x <= #2]& @@@ Partition[radii, 2, 1])
+		If[#!={}, #[[-1]], {Missing[], Missing[]}]& /@ (Cases[v2, {x_, d_} /; #1 < x <= #2]& @@@ Partition[radii, 2, 1])
 	]
 
 
