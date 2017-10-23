@@ -244,7 +244,7 @@ nbody6Input[file_, opts:OptionsPattern[]] :=
 
 
 ReadOutput[file_] := 
-	Module[{strm, string, string1, template1, read1, scalings}, 
+	Module[{strm, string, string1, template1, read1, scalings, read2}, 
 		strm = OpenRead[file];
 		string = ReadList[strm, String];
 		Close[strm];
@@ -253,7 +253,8 @@ ReadOutput[file_] :=
 		template1 = {5,6,6,7,5,7,6,7,6,6,7,5,6,8,8,9,7,7,6,6,6,6};
 		template1 = {1,0} + #& /@ Partition[Prepend[Accumulate[template1], 0], 2, 1];
 		read1 = StringToNumbers /@ First@StringTake[#, template1]&;
-		{scalings, read1 /@ string1}
+		read2 = DeleteCases[StringCases[string, "T ="~~t___~~"N = "~~n___~~"<NB>"~~___ :> StringToNumbers /@ {t,n} ], {}];
+		{scalings, read1 /@ string1, read2}
 
 	]
 
