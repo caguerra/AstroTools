@@ -368,13 +368,15 @@ PermanentBinaries[multiples1_, multiples2_] :=
 
 Clear[ScaledListPlot];
 
-Options[ScaledListPlot] = Options[ListPlot];
+Options[ScaledListPlot] = Join[{"ShowAllScales" -> False }, Options[ListPlot]];
 
 ScaledListPlot[list:{{{_?NumberQ, _?NumberQ}..}..}, {scalex_, scaley_}, opts:OptionsPattern[]] := 
 	Module[{newlist},
+		
 		newlist = Transpose[{scalex, scaley} Transpose[#]] & /@ list;
+		
 		ListLinePlot[newlist, 
-			opts, 
+			Sequence @@ FilterRules[opts, Options[ListPlot]], 
 			Frame -> True, 
 			GridLines -> Automatic]
 	];
@@ -384,12 +386,26 @@ ScaledListPlot[list:{{{_?NumberQ, _?NumberQ}..}..}, opts:OptionsPattern[]] := Sc
 ScaledListPlot[list:{{{_?NumberQ, _?NumberQ}..}..}, scale_, opts:OptionsPattern[]] := ScaledListPlot[list, {$TimeScale, scale}, opts];
 
 ScaledListPlot[list:{{_?NumberQ, _?NumberQ}..}, {scalex_, scaley_}, opts:OptionsPattern[]] := 
-	Module[{newlist},
-		newlist = Transpose[{scalex, scaley} Transpose[list]];
-		ListLinePlot[newlist, 
-			opts, 
-			Frame -> True, 
-			GridLines -> Automatic]
+	Module[{newlist, ticks, ticksXD, ticksYL, ticksXU, ticksYR},
+		
+		If[OptionValue["ShowAllScales"],
+			ticks = Ticks /. FullOptions[ListPlot[list, ImageSize -> 100]];
+			ticksXD = IntegerPart@DeleteCases[ticks[[1]], {_, "", ___}][[All, 1]];
+			ticksYL = IntegerPart@DeleteCases[ticks[[2]], {_, "", ___}][[All, 1]];
+			ticksXU = Transpose[{ticksXD, Internal`StringToDouble[ToString[NumberForm[#, {8, 1}]]] & /@ (ticksXD scalex)}];
+			ticksYR = Transpose[{ticksYL, Internal`StringToDouble[ToString[NumberForm[#, {8, 1}]]] & /@ (ticksYL scaley)}];
+			ListLinePlot[list, 
+				Sequence @@ FilterRules[opts, Options[ListPlot]], 
+				Frame -> True, 
+				FrameTicks -> {{ticksYL, ticksYR}, {ticksXD, ticksXU}},
+				GridLines -> Automatic]
+			,
+			newlist = Transpose[{scalex, scaley} Transpose[list]];
+			ListLinePlot[newlist, 
+				Sequence @@ FilterRules[opts, Options[ListPlot]], 
+				Frame -> True, 
+				GridLines -> Automatic]
+		]
 	];
 
 ScaledListPlot[list:{{_?NumberQ, _?NumberQ}..}, opts:OptionsPattern[]] := ScaledListPlot[list, {1, 1}, opts];
