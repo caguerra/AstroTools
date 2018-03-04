@@ -389,12 +389,14 @@ ScaledListPlot[list:{{_?NumberQ, _?NumberQ}..}, {scalex_, scaley_}, opts:Options
 	Module[{newlist, ticks, ticksXD, ticksYL, ticksXU, ticksYR},
 
 		If[OptionValue["ShowAllScales"],
-			ticks = Ticks /. FullOptions[ListPlot[list, ImageSize -> 100]];
+			ticks = Ticks /. FullOptions[
+												ListPlot[list, ImageSize -> 100,
+													Sequence @@ FilterRules[{opts}, Options[ListPlot]]]];
 			ticksXD = DeleteCases[ticks[[1]], {_, "", ___}][[All, 1]];
 			ticksYL = DeleteCases[ticks[[2]], {_, "", ___}][[All, 1]];
 			(* ticksXU = Transpose[{ticksXD, Internal`StringToDouble[ToString[NumberForm[#, {8, 1}]]] & /@ (ticksXD scalex)}];
 			ticksYR = Transpose[{ticksYL, Internal`StringToDouble[ToString[NumberForm[#, {8, 1}]]] & /@ (ticksYL scaley)}]; *)
-			ticksXU = Transpose[{ticksXD, # & /@ (ticksXD scalex)}];
+			ticksXU = Transpose[{ticksXD, Round[#, 1.0] & /@ (ticksXD scalex)}];
 			ticksYR = Transpose[{ticksYL, # & /@ (ticksYL scaley)}];
 			ListLinePlot[list,
 				Sequence @@ FilterRules[{opts}, Options[ListPlot]],
