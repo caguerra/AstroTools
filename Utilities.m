@@ -94,7 +94,7 @@ DeleteOuts[memInMB_:500] :=
 			Print["No Out[] greater than ", ToString[memInMB], "MB"]; Return[],
 			Print["Out with mem greater than ", ToString[memInMB], "MP: ", Rule@@@outs] ];
 
-		boole = ChoiceDialog["Sure you want to delete Outs?"];
+		boole = ChoiceDialog["Do you want to delete Outs?"];
  		If[ boole === True,
  			Print["Deleting outputs ..."];
 			Unprotect[Out];
@@ -276,7 +276,7 @@ FindBinaries[mass_,position_,velocity_] :=
 	];
 
 Clear[TwoBodyProperties];
-TwoBodyProperties[{{mass1_, pos1_, vel1_}, {mass2_, pos2_, vel2_}}] :=
+TwoBodyProperties[{{id1_, mass1_, pos1_, vel1_}, {id2_, mass2_, pos2_, vel2_}}] :=
   	Module[{distance, relativeSpeed, massProduct, energy, majorAxis,
     totalMass, cm, vcm},
    		distance = EuclideanDistance[pos2, pos1];
@@ -287,7 +287,8 @@ TwoBodyProperties[{{mass1_, pos1_, vel1_}, {mass2_, pos2_, vel2_}}] :=
    		majorAxis = massProduct/(2 Abs[energy]);
    		cm = (mass1 pos1 + mass2 pos2)/totalMass;
    		vcm = (mass1 vel1 + mass2 vel2)/totalMass;
-   		{totalMass, distance, relativeSpeed, cm, vcm, majorAxis, energy}
+   		{totalMass, distance, relativeSpeed, cm, vcm, majorAxis, energy,
+			{id1, mass1, pos1, vel1}, {id2, mass2, pos2, vel2}}
    	];
 
 Clear[InstantaneousMultiples];
@@ -295,34 +296,34 @@ InstantaneousMultiples[id_, m_, x_, v_] :=
  	Module[{nearest, mutualNearest, singleRules, pairProperties,
  		negativeEnergyQ, binaries, binariesProperties, starOfSystemQ,
  		id2, m2, x2, v2, nearest1, nearest2, nearest3, binaryRules, triples,
- 		triplesProperties, triplesRules, quadruples, quadruplesProperties},
+ 		triplesProperties, triplesRules, quadruples, quadruplesProperties, name},
 
   		(*--- Look for binaries ---*)
-  		nearest = Nearest[Thread[x -> id], x, 2];
+  		nearest = Nearest[Thread[x -> (name/@id)], x, 2];
   		mutualNearest =
-  			Select[Gather[nearest, #1 == Reverse[#2] &], Length[#] == 2 &][[All, All, 1]];
-  		singleRules = Dispatch[Thread[id -> Transpose[{m, x, v}]]];
+			Select[Gather[nearest, #1 === Reverse[#2] &], Length[#] == 2 &][[All, All, 1]];
+  		singleRules = Thread[(name/@id) -> Transpose[{id, m, x, v}]];
   		pairProperties = TwoBodyProperties /@ (mutualNearest /. singleRules);
-  		negativeEnergyQ = Negative /@ pairProperties[[All, -1]];
-  		binaries = Pick[mutualNearest, negativeEnergyQ];
+  		negativeEnergyQ = Negative /@ pairProperties[[All, 7]];
+  		binaries = Pick[mutualNearest, negativeEnergyQ] /. name->Identity;
   		binariesProperties = Pick[pairProperties, negativeEnergyQ];
 
   		(*--- Look for triples ---*)
   		If[Length[binaries]!=0,
 	  		starOfSystemQ = Replace[Replace[id, Thread[Flatten[binaries] -> True], 1], Except[True] -> False, 1];
-	  		id2 = Pick[id, starOfSystemQ, False];
+	  		id2 = Pick[(name/@id), starOfSystemQ, False];
 	  		m2 = Pick[m, starOfSystemQ, False];
 	  		x2 = Pick[x, starOfSystemQ, False];
 	  		v2 = Pick[v, starOfSystemQ, False];
-	  		nearest1 = Transpose[{id2, Nearest[Thread[binariesProperties[[All, 4]] -> binaries], x2, 1][[All, 1]]}];
-	  		nearest2 = Transpose[{binaries, Nearest[Thread[x2 -> id2], binariesProperties[[All, 4]], 1][[All, 1]]}];
+	  		nearest1 = Transpose[{id2, Nearest[Thread[binariesProperties[[All, 4]] -> name/@binaries], x2, 1][[All, 1]]}];
+	  		nearest2 = Transpose[{name/@binaries, Nearest[Thread[x2 -> id2], binariesProperties[[All, 4]], 1][[All, 1]]}];
 	  		nearest = Join[nearest1, nearest2];
 	  		mutualNearest = Select[Gather[nearest, #1 === Reverse[#2] &], Length[#] == 2 &][[All, All, 1]];
-	  		binaryRules = Thread[binaries -> binariesProperties[[All, {1, 4, 5}]]];
+	  		binaryRules = Thread[(name/@binaries) -> MapThread[Prepend, {binariesProperties[[All, {1, 4, 5}]], binaries}] ];
 	  		pairProperties = TwoBodyProperties /@ (mutualNearest /. binaryRules /. singleRules);
-	  		negativeEnergyQ = Negative /@ pairProperties[[All, -1]];
-	  		triples = Pick[mutualNearest, negativeEnergyQ];
-	  		triplesProperties = Pick[pairProperties, negativeEnergyQ]
+	  		negativeEnergyQ = Negative /@ pairProperties[[All, 7]];
+	  		triples = Pick[mutualNearest, negativeEnergyQ] /. name -> Identity;
+	  		triplesProperties = Pick[pairProperties, negativeEnergyQ];
   			,
   			triples = {};
   			triplesProperties = {}
@@ -330,28 +331,34 @@ InstantaneousMultiples[id_, m_, x_, v_] :=
 
   		(* Look for quadruples *)
   		If[Length[triples]!=0,
-  		starOfSystemQ = Replace[Replace[id, Thread[Union[Flatten[Join[binaries, triples]]] -> True], 1], Except[True] -> False, 1];
-  		id2 = Pick[id, starOfSystemQ, False];
-  		m2 = Pick[m, starOfSystemQ, False];
-  		x2 = Pick[x, starOfSystemQ, False];
-  		v2 = Pick[v, starOfSystemQ, False];
-  		nearest1 = Transpose[{id2, Nearest[Thread[triplesProperties[[All, 4]] -> triples], x2, 1][[All, 1]]}];
-  		nearest2 = Transpose[{triples, Nearest[Thread[x2 -> id2], triplesProperties[[All, 4]], 1][[All, 1]]}];
-  		nearest3 = If[Length[binaries] > 1, Nearest[Thread[binariesProperties[[All, 4]] -> binaries], binariesProperties[[All, 4]], 2], {}];
-
-  		nearest = Join[nearest1, nearest2, nearest3];
-  		mutualNearest = Select[Gather[nearest, #1 === Reverse[#2] &], Length[#] == 2 &][[All, All, 1]];
-  		triplesRules = Thread[triples -> triplesProperties[[All, {1, 4, 5}]]];
-  		pairProperties = TwoBodyProperties /@ (mutualNearest /. triplesRules /. binaryRules /. singleRules);
-  		negativeEnergyQ = Negative /@ pairProperties[[All, -1]];
-  		quadruples = Pick[mutualNearest, negativeEnergyQ];
-  		quadruplesProperties = Pick[pairProperties, negativeEnergyQ]
-  		,
-  		quadruples = {};
-  		quadruplesProperties = {}
+  			starOfSystemQ = Replace[Replace[id, Thread[Union[Flatten[Join[binaries, triples]]] -> True], 1], Except[True] -> False, 1];
+  			id2 = Pick[name/@id, starOfSystemQ, False];
+  			m2 = Pick[m, starOfSystemQ, False];
+  			x2 = Pick[x, starOfSystemQ, False];
+  			v2 = Pick[v, starOfSystemQ, False];
+  			nearest1 = Transpose[{id2, Nearest[Thread[triplesProperties[[All, 4]] -> name/@triples], x2, 1][[All, 1]]}];
+  			nearest2 = Transpose[{name/@triples, Nearest[Thread[x2 -> id2], triplesProperties[[All, 4]], 1][[All, 1]]}];
+  			nearest3 = If[Length[binaries] > 1, Nearest[Thread[binariesProperties[[All, 4]] -> name/@binaries], binariesProperties[[All, 4]], 2], {}];
+  			nearest = Join[nearest1, nearest2, nearest3];
+  			mutualNearest = Select[Gather[nearest, #1 === Reverse[#2] &], Length[#] == 2 &][[All, All, 1]];
+  			triplesRules = Thread[name/@triples -> MapThread[Prepend, {triplesProperties[[All, {1, 4, 5}]], triples}] ];
+  			pairProperties = TwoBodyProperties /@ (mutualNearest /. triplesRules /. binaryRules /. singleRules);
+  			negativeEnergyQ = Negative /@ pairProperties[[All, 7]];
+  			quadruples = Pick[mutualNearest, negativeEnergyQ]  /. name -> Identity;
+  			quadruplesProperties = Pick[pairProperties, negativeEnergyQ];
+  			,
+  			quadruples = {};
+  			quadruplesProperties = {}
   		];
 
-  		{{binaries, binariesProperties}, {triples, triplesProperties}, {quadruples, quadruplesProperties}}
+(*
+			OLD WAY TO STORE BINARIES
+			{{binaries, binariesProperties}, {triples, triplesProperties}, {quadruples, quadruplesProperties}}
+*)
+			AssociationThread[{"Name", "TotalMass", "Distance", "RelativeSpeed", "RCM", "VCM", "MajorAxis",
+				"Energy", "Component1", "Component2"} -> #] & /@
+						MapThread[Prepend, {Join[binariesProperties, triplesProperties, quadruplesProperties], Join[binaries, triples, quadruples]}]
+
   	]
 
 PermanentBinaries[multiples1_, multiples2_] :=
