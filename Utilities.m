@@ -605,6 +605,8 @@ ClusterPlot3D[{pos_, cm_, mcm_}, time_, opts:OptionsPattern[]] :=
 Clear[MinimalistHistogram];
 Options[MinimalistHistogram] = Join[{"LineColor"-> Black, "Normalization" -> "Counts"}, Options[Graphics]];
 
+MinimalistHistogram[{}, ___] := Graphics[{}]
+
 MinimalistHistogram[list_, {width_}, opts:OptionsPattern[]] :=
 	Module[{min, max, range, bins, histoX, histoY, normalization, area},
 		min = Min[list];
