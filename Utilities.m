@@ -299,7 +299,7 @@ InstantaneousMultiples[id_, m_, x_, v_] :=
  		triplesProperties, triplesRules, quadruples, quadruplesProperties, name},
 
   		(*--- Look for binaries ---*)
-  		nearest = Nearest[Thread[x -> (name/@id)], x, 2F];
+  		nearest = Nearest[Thread[x -> (name/@id)], x, 2];
   		mutualNearest =
 			Select[Gather[nearest, #1 === Reverse[#2] &], Length[#] == 2 &][[All, All, 1]];
   		singleRules = Thread[(name/@id) -> Transpose[{id, m, x, v}]];
@@ -545,7 +545,12 @@ ClusterPlot[ids : {_?NumberQ ..}, pos : {{_?NumberQ, _?NumberQ, _?NumberQ} ..}, 
      					directives = defaultDirectives,
      					directives = singles
      				];
-    				primitives0 = Join[directives, Point /@ ids /. rules];
+    				primitives0 =
+						If[multipleLabels,
+							Join[directives, (Tooltip[Point[#], ToString[#]] & /@ ids) /. rules]
+							,
+							Join[directives, Point /@ ids /. rules]
+						];
     				primitives = {primitives0, primitives2, primitives3, primitives4};
     			]
    		];
