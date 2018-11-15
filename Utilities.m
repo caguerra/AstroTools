@@ -94,14 +94,10 @@ DeleteOuts[memInMB_:500] :=
 			Print["No Out[] greater than ", ToString[memInMB], "MB"]; Return[],
 			Print["Out with mem greater than ", ToString[memInMB], "MP: ", Rule@@@outs] ];
 
-		boole = ChoiceDialog["Do you want to delete Outs?"];
- 		If[ boole === True,
- 			Print["Deleting outputs ..."];
-			Unprotect[Out];
-			Do[Out[out]=., {out, outs[[All,1]]}];
-			Protect[Out],
-			Print["Canceled"]
-		];
+ 		Print["Deleting outputs ..."];
+		Unprotect[Out];
+		Do[Out[out]=., {out, outs[[All,1]]}];
+		Protect[Out]
 
 		Print["session mem: ", memToString[MemoryInUse[]] ];
 	];
@@ -582,7 +578,7 @@ Graphics[{AbsoluteThickness[0.6],
    Frame -> True, PlotRange -> {{-200, 200}, {-200, 200}}]
 *)
 
-Options[ClusterPlot3D] = Join[{"Scale" -> {1, 1, 1}, "Window" -> 50, "WindowCenter" -> {0, 0, 0} }, Options[ListPointPlot3D]];
+(*Options[ClusterPlot3D] = Join[{"Scale" -> {1, 1, 1}, "Window" -> 50, "WindowCenter" -> {0, 0, 0} }, Options[ListPointPlot3D]];
 
 ClusterPlot3D[{pos_, cm_, mcm_}, time_, opts:OptionsPattern[]] :=
 	Module[
@@ -604,7 +600,97 @@ ClusterPlot3D[{pos_, cm_, mcm_}, time_, opts:OptionsPattern[]] :=
 					Green, Point[ scale mcm[[time]]]}];
 
 		Show[plot1, plot2]
-	]
+	]*)
+
+
+
+	Clear[ClusterPlot3D]
+
+	Options[ClusterPlot3D] =
+	  	Join[{"Scale" -> {1, 1, 1}, "Singles" -> Automatic, "MultipleLabels" -> False,
+	    		"Doubles" -> Automatic, "Triples" -> Automatic, "Quadruples" -> Automatic, "ExtraPrimitives"->{}}, Options[Graphics]];
+
+	ClusterPlot3D[ids : {_?NumberQ ..}, pos : {{_?NumberQ, _?NumberQ, _?NumberQ} ..}, opts : OptionsPattern[]] :=
+	 	Module[{pos2, scale, labels, singles, directives, primitives, defaultDirectives, doubles, triples,
+	 		cuadruples, multiples, rules, primitives2, primitives3, primitives4, primitives1, primitives0, multipleLabels, extraPrimitives},
+
+	  		scale = OptionValue["Scale"];
+	  		pos2 = If[scale == {1, 1, 1}, pos, (scale * #)& /@ pos];
+	  		multipleLabels = OptionValue["MultipleLabels"];
+	  		(* labels = {{#2, None}, {#1, None}} & @@ (proy /. {1 -> "x", 2 -> "y", 3 -> "z"}); *)
+	  		singles = OptionValue["Singles"];
+	  		doubles = OptionValue["Doubles"];
+	  		triples = OptionValue["Triples"];
+	  		cuadruples = OptionValue["Quadruples"];
+			extraPrimitives = OptionValue["ExtraPrimitives"];
+
+	  		defaultDirectives = {AbsolutePointSize[2], Blue};
+	  		rules = Dispatch[Thread[ids -> pos2]];
+
+	  		If[ doubles === Automatic && triples === Automatic && cuadruples === Automatic,
+	   			If[ MatchQ[singles, {__Rule}],
+	    				singles = Flatten[Map[If[MatchQ[#[[1]], _List], Thread[#, List, 1], #] &, singles], 1];
+	    				primitives =
+	     					Join[defaultDirectives,
+	     						Flatten /@ (Transpose[{ids, Point /@ pos2}] /. singles /. {_Integer, p_} :> p)]
+	    				,
+	    				If[singles === Automatic,
+	     					directives = defaultDirectives,
+	     					directives = singles
+	     				];
+	    				primitives = {If[MatchQ[directives, _List], Sequence @@ directives, directives], Point[pos2]}
+	    		]
+	   			,
+	   			doubles = doubles /. Automatic -> {};
+	   			triples = triples /. Automatic -> {};
+	   			cuadruples = cuadruples /. Automatic -> {};
+
+	   			doubles = Flatten[Map[If[MatchQ[#[[1]], x_List /; ArrayDepth[x] > 1], Thread[#, List, 1], #] &, doubles], 1];
+	   			triples = Flatten[Map[If[MatchQ[#[[1]], x_List /; ArrayDepth[x] > 1], Thread[#, List, 1], #] &, triples], 1];
+	   			cuadruples = Flatten[Map[If[MatchQ[#[[1]], x_List /; ArrayDepth[x] > 1], Thread[#, List, 1], #] &, cuadruples], 1];
+
+	   			multiples = Union @ Flatten[Reverse@Join[doubles[[All, 1]], triples[[All, 1]], cuadruples[[All, 1]]]];
+
+	   			If[ multipleLabels,
+	    				primitives2 = {If[Head[#2] === List, Sequence @@ #2, #2],
+	    					Sequence @@ ({Line[#], Map[Tooltip[Point[#], ToString[#]] &, #]} & @ Flatten[#1] /. rules)} & @@@ doubles;
+	    				primitives3 = {If[Head[#2] === List, Sequence @@ #2, #2],
+	    					Sequence @@ ({Line[#], Map[Tooltip[Point[#], ToString[#]] &, #]} & @ Flatten[#1] /. rules)} & @@@ triples;
+	    				primitives4 = {If[Head[#2] === List, Sequence @@ #2, #2],
+	    					Sequence @@ ({Line[#], Map[Tooltip[Point[#], ToString[#]] &, #]} & @ Flatten[#1] /. rules)} & @@@ cuadruples;
+	    				,
+	    				primitives2 = {If[Head[#2] === List, Sequence @@ #2, #2],
+	    					Sequence @@ ({Line[#], Point[#]} & @ Flatten[#1] /. rules)} & @@@ doubles;
+	    				primitives3 = {If[Head[#2] === List, Sequence @@ #2, #2],
+	    					Sequence @@ ({Line[#], Point[#]} & @ Flatten[#1] /. rules)} & @@@ triples;
+	    				primitives4 = {If[Head[#2] === List, Sequence @@ #2, #2],
+	    					Sequence @@ ({Line[#], Point[#]} & @ Flatten[#1] /. rules)} & @@@ cuadruples;
+	    			];
+
+	   			If[ MatchQ[singles, {__Rule}],
+	    				singles = Flatten[Map[If[MatchQ[#[[1]], _List], Thread[#, List, 1], #] &, singles], 1];
+	    				primitives0 = Join[defaultDirectives, Point /@ Complement[ids, multiples] /. rules];
+	    				primitives1 = {If[Head[#2] === List, Sequence @@ #2, #2], Point @ #1 /. rules} & @@@ singles;
+	    				primitives = {primitives0, primitives1, primitives2, primitives3, primitives4};
+	    				,
+	    				If[singles === Automatic,
+	     					directives = defaultDirectives,
+	     					directives = singles
+	     				];
+	    				primitives0 =
+							If[multipleLabels,
+								Join[directives, (Tooltip[Point[#], ToString[#]] & /@ ids) /. rules]
+								,
+								Join[directives, Point /@ ids /. rules]
+							];
+	    				primitives = {primitives0, primitives2, primitives3, primitives4};
+	    			]
+	   		];
+
+	  		Graphics3D[Join[primitives, extraPrimitives],
+	  			Sequence @@ FilterRules[{opts}, Options[Graphics3D]],
+	   				Frame -> True, AspectRatio -> Automatic (*, FrameLabel -> labels*)]
+	  	]
 
 
 Clear[MinimalistHistogram];
