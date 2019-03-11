@@ -199,6 +199,7 @@ auxTotalPotentialEnergy1 =
 			nmax = Length @ mass;
 			sum = 0.;
 			Do[
+				If[pos[[i]] == pos[[j]], Return[0]];
 				sum = sum + mass[[i]] mass[[j]]/
 				(\[Sqrt]((pos[[i,1]]-pos[[j,1]])^2+(pos[[i,2]]-pos[[j,2]])^2+(pos[[i,3]]-pos[[j,3]])^2)),
 				{i, nmax}, {j, i-1}
@@ -288,7 +289,7 @@ TwoBodyProperties[{{id1_, mass1_, pos1_, vel1_}, {id2_, mass2_, pos2_, vel2_}}] 
    	];
 
 Clear[InstantaneousMultiples];
-InstantaneousMultiples[id_, m_, x_, v_] :=
+InstantaneousMultiples[id_, m_, x_, v_, runID_] :=
  	Module[{nearest, mutualNearest, singleRules, pairProperties,
  		negativeEnergyQ, binaries, binariesProperties, starOfSystemQ,
  		id2, m2, x2, v2, nearest1, nearest2, nearest3, binaryRules, triples,
@@ -351,9 +352,10 @@ InstantaneousMultiples[id_, m_, x_, v_] :=
 			OLD WAY TO STORE BINARIES
 			{{binaries, binariesProperties}, {triples, triplesProperties}, {quadruples, quadruplesProperties}}
 *)
-			AssociationThread[{"Name", "TotalMass", "Distance", "RelativeSpeed", "RCM", "VCM", "MajorAxis",
+			Append["RunID" -> runID] /@ (
+				AssociationThread[{"Name", "TotalMass", "Distance", "RelativeSpeed", "RCM", "VCM", "MajorAxis",
 				"Energy", "Component1", "Component2"} -> #] & /@
-						MapThread[Prepend, {Join[binariesProperties, triplesProperties, quadruplesProperties], Join[binaries, triples, quadruples]}]
+						MapThread[Prepend, {Join[binariesProperties, triplesProperties, quadruplesProperties], Join[binaries, triples, quadruples]}] )
 
   	]
 
@@ -693,7 +695,7 @@ ClusterPlot3D[{pos_, cm_, mcm_}, time_, opts:OptionsPattern[]] :=
 	  	]
 
 
-Clear[MinimalistHistogram];
+Clear[istogram];
 Options[MinimalistHistogram] = Join[{"LineColor"-> Black, "Normalization" -> "Counts"}, Options[Graphics]];
 
 MinimalistHistogram[{}, ___] := Graphics[{}]
@@ -710,7 +712,10 @@ MinimalistHistogram[list_, {width_}, opts:OptionsPattern[]] :=
 			Which[
 				normalization === "Counts", bins,
 				normalization === "Max", bins/Max[bins],
-				normalization === "PDF", bins/area
+				normalization === "PDF", bins/area,
+				VectorQ[normalization],
+					100 * bins / BinCounts[normalization, {min, max, width}],
+				Head[normalization] === Function || Head[normalization] === Symbol, normalization@bins
 			];
 
 		histoX = Riffle[range, range];
